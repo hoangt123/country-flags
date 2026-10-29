@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { COUNTRIES, REGION_EMOJI, REGIONS } from '../data'
 import { flagUrl } from '../lib/flags'
-import { computeStreak, store, useStore } from '../lib/store'
+import { computeStreak, useStore } from '../lib/store'
 import { masteryOf, MASTERY_LABEL, type Mastery } from '../lib/srs'
 import { dayKey, formatDuration, pct, shortDate } from '../lib/format'
+import DataCard from '../components/DataCard'
 import ScoreChart from '../components/ScoreChart'
 import CountryModal from '../components/CountryModal'
 import { TEST_GOAL } from './Test'
@@ -22,7 +23,6 @@ export default function Progress() {
   const { cards, tests, days } = state
   const [open, setOpen] = useState<string | null>(null)
   const [gridFilter, setGridFilter] = useState<Mastery | 'all'>('all')
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const mastery = useMemo(() => {
     const counts: Record<Mastery, number> = { new: 0, weak: 0, learning: 0, strong: 0, mastered: 0 }
@@ -76,24 +76,6 @@ export default function Progress() {
     }
     return cells
   }, [days])
-
-  const exportData = () => {
-    const blob = new Blob([store.exportJSON()], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `flag-quest-backup-${dayKey()}.json`
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }
-
-  const importData = async (file: File) => {
-    try {
-      store.importJSON(await file.text())
-      alert('Progress imported.')
-    } catch (e) {
-      alert(`Import failed: ${(e as Error).message}`)
-    }
-  }
 
   const gridList = COUNTRIES.filter((c) => gridFilter === 'all' || masteryOf(cards[c.code]) === gridFilter)
 
@@ -263,27 +245,7 @@ export default function Progress() {
         </div>
       </div>
 
-      <div className="card stack">
-        <h3>Your data</h3>
-        <p className="muted small">Progress is saved in this browser. Export a backup to move it to another device.</p>
-        <div className="row">
-          <button className="btn sm" onClick={exportData}>
-            Export backup
-          </button>
-          <button className="btn sm" onClick={() => fileRef.current?.click()}>
-            Import backup
-          </button>
-          <input ref={fileRef} type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} />
-          <button
-            className="btn sm red"
-            onClick={() => {
-              if (confirm('Reset all progress? This cannot be undone.')) store.resetProgress()
-            }}
-          >
-            Reset
-          </button>
-        </div>
-      </div>
+      <DataCard />
 
       {open && <CountryModal code={open} onClose={() => setOpen(null)} />}
     </div>

@@ -119,7 +119,7 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
   }
 
   const focusOptions: { id: Focus; label: string; desc: string }[] = [
-    { id: 'smart', label: '🧠 Smart review', desc: `${counts.due} due · ${counts.fresh} new — spaced repetition picks what you need most` },
+    { id: 'smart', label: '🧠 Smart review', desc: `${counts.due} due · ${counts.weak} shaky · ${counts.fresh} new — weak flags show up to 10× more often than mastered ones` },
     { id: 'new', label: '✨ New flags', desc: `${counts.fresh} flags you haven't seen yet` },
     { id: 'weak', label: '🎯 Trouble flags', desc: `${counts.weak} flags you keep missing` },
     { id: 'lookalikes', label: '👯 Look-alikes', desc: 'Drill a set of easily confused flags' },
@@ -222,6 +222,16 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
       <button className="btn primary lg block" onClick={start}>
         Start practice
       </button>
+
+      <div className="card stack">
+        <h3>How cards are chosen</h3>
+        <ul className="muted small" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>
+          <li>Every answer moves a flag between six levels. A correct answer promotes it one level and schedules the next review further out (10 min → 1 day → 3 days → 1 week → 3 weeks); a miss drops it back to the bottom.</li>
+          <li>Smart review fills a session with everything that is due, then runs a weighted lottery for the rest: "needs work" flags carry weight 10, new flags 4, mastered flags 1, and anything overdue is tripled.</li>
+          <li>Within a session, a missed flag is re-asked later until you get it right. Only your first attempt counts toward its level.</li>
+          <li>Test mode ignores all of this and picks flags uniformly at random, so scores are comparable over time.</li>
+        </ul>
+      </div>
     </div>
   )
 }

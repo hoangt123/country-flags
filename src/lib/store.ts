@@ -41,6 +41,7 @@ export interface Settings {
 
 export interface State {
   version: 1
+  updatedAt: number
   cards: Record<string, CardStat>
   tests: TestResult[]
   sessions: SessionResult[]
@@ -60,24 +61,64 @@ export const defaultSettings: Settings = {
   theme: 'auto',
 }
 
+export function emptyState(): State {
+  return { version: 1, updatedAt: 0, cards: {}, tests: [], sessions: [], days: {}, settings: { ...defaultSettings } }
+}
+
+/** Coerce anything JSON-ish into a well-formed State. Throws if it isn't a backup. */
+export function parseState(parsed: unknown): State {
+  const p = parsed as Partial<State> | null
+  if (!p || typeof p !== 'object' || typeof p.cards !== 'object') throw new Error('Not a Flag Quest progress file')
+  return {
+    version: 1,
+    updatedAt: typeof p.updatedAt === 'number' ? p.updatedAt : 0,
+    cards: p.cards ?? {},
+    tests: Array.isArray(p.tests) ? p.tests : [],
+    sessions: Array.isArray(p.sessions) ? p.sessions : [],
+    days: p.days ?? {},
+    settings: { ...defaultSettings, ...(p.settings ?? {}) },
+  }
+}
+
+/**
+ * Merge two copies of progress without losing anything: per flag keep the most
+ * recently answered stats, union tests and sessions, and take the larger daily
+ * counts. Settings follow whichever copy was saved last.
+ */
+export function mergeStates(a: State, b: State): State {
+  const [older, newer] = a.updatedAt <= b.updatedAt ? [a, b] : [b, a]
+  const cards: Record<string, CardStat> = { ...older.cards }
+  for (const [code, stat] of Object.entries(newer.cards)) {
+    const cur = cards[code]
+    cards[code] = !cur || stat.last >= cur.last ? stat : cur
+  }
+  const testIds = new Set<string>()
+  const tests = [...older.tests, ...newer.tests]
+    .filter((t) => (testIds.has(t.id) ? false : (testIds.add(t.id), true)))
+    .sort((x, y) => x.date - y.date)
+  const sessionKeys = new Set<string>()
+  const sessions = [...older.sessions, ...newer.sessions]
+    .filter((s) => {
+      const k = `${s.date}:${s.total}`
+      return sessionKeys.has(k) ? false : (sessionKeys.add(k), true)
+    })
+    .sort((x, y) => x.date - y.date)
+  const days: Record<string, DayLog> = { ...older.days }
+  for (const [k, d] of Object.entries(newer.days)) {
+    const cur = days[k]
+    days[k] = cur ? { answered: Math.max(cur.answered, d.answered), correct: Math.max(cur.correct, d.correct), xp: Math.max(cur.xp, d.xp) } : d
+  }
+  return { version: 1, updatedAt: Math.max(a.updatedAt, b.updatedAt), cards, tests, sessions, days, settings: newer.settings }
+}
+
 function load(): State {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<State>
-      return {
-        version: 1,
-        cards: parsed.cards ?? {},
-        tests: parsed.tests ?? [],
-        sessions: parsed.sessions ?? [],
-        days: parsed.days ?? {},
-        settings: { ...defaultSettings, ...(parsed.settings ?? {}) },
-      }
-    }
+    if (raw) return parseState(JSON.parse(raw))
   } catch {
     /* ignore */
   }
-  return { version: 1, cards: {}, tests: [], sessions: [], days: {}, settings: { ...defaultSettings } }
+  return emptyState()
 }
 
 let state: State = load()
@@ -93,7 +134,7 @@ function emit() {
 }
 
 function set(updater: (s: State) => State) {
-  state = updater(state)
+  state = { ...updater(state), updatedAt: Date.now() }
   emit()
 }
 
@@ -129,17 +170,15 @@ export const store = {
   exportJSON(): string {
     return JSON.stringify(state, null, 2)
   },
+  /** Merge a backup into the current progress (nothing is lost either way). */
   importJSON(json: string) {
-    const parsed = JSON.parse(json) as Partial<State>
-    if (!parsed || typeof parsed !== 'object' || !parsed.cards) throw new Error('Not a Flag Quest backup file')
-    set(() => ({
-      version: 1,
-      cards: parsed.cards ?? {},
-      tests: parsed.tests ?? [],
-      sessions: parsed.sessions ?? [],
-      days: parsed.days ?? {},
-      settings: { ...defaultSettings, ...(parsed.settings ?? {}) },
-    }))
+    const incoming = parseState(JSON.parse(json))
+    set((s) => mergeStates(s, incoming))
+  },
+  /** Replace state wholesale without bumping updatedAt (used by file sync after a merge). */
+  replace(next: State) {
+    state = next
+    emit()
   },
 }
 

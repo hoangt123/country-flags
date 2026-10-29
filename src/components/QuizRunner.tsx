@@ -3,7 +3,8 @@ import type { Country } from '../data'
 import { flagUrl } from '../lib/flags'
 import { isCorrectName, makeChoices, xpFor } from '../lib/quiz'
 import { playCorrect, playWrong } from '../lib/audio'
-import { store, type AnswerMode } from '../lib/store'
+import { store, useStore, type AnswerMode } from '../lib/store'
+import { masteryOf, MASTERY_LABEL } from '../lib/srs'
 import CountryDetail from './CountryDetail'
 import LocatorMap from './LocatorMap'
 import TypeAnswer from './TypeAnswer'
@@ -53,8 +54,10 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
   const startRef = useRef(Date.now())
   const doneRef = useRef(false)
 
+  const { cards } = useStore()
   const item = items[idx]
   const country = item?.country
+  const mastery = country ? masteryOf(cards[country.code]) : 'new'
   const uniqueTotal = queue.length
   const solved = useMemo(() => new Set(answers.filter((a) => a.correct).map((a) => a.code)).size, [answers])
   const progress = mode === 'practice' ? solved / uniqueTotal : idx / uniqueTotal
@@ -167,8 +170,9 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
               </div>
               <LocatorMap country={country} showNeighborLabels={neighborLabels} />
             </div>
-            <p className="prompt">
-              {item.retry ? 'One more time — which country is this?' : 'Which country is this flag?'}
+            <p className="prompt row" style={{ gap: 10 }}>
+              <span>{item.retry ? 'One more time — which country is this?' : 'Which country is this flag?'}</span>
+              {mode === 'practice' && !item.retry && <span className={`pill ${mastery}`}>{mastery === 'new' ? 'New flag' : MASTERY_LABEL[mastery]}</span>}
             </p>
             {answerMode === 'choice' ? (
               <div className="choices">

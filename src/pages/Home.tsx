@@ -3,6 +3,7 @@ import { computeStreak, store, useStore } from '../lib/store'
 import { masteryOf } from '../lib/srs'
 import { dayKey } from '../lib/format'
 import { TEST_GOAL } from './Test'
+import { reconnect, useFileSync } from '../lib/fileSync'
 
 interface Props {
   go: (route: string) => void
@@ -10,6 +11,7 @@ interface Props {
 
 export default function Home({ go }: Props) {
   const { cards, tests, days, settings } = useStore()
+  const fs = useFileSync()
   const now = Date.now()
   const solid = COUNTRIES.filter((c) => ['mastered', 'strong'].includes(masteryOf(cards[c.code]))).length
   const due = COUNTRIES.filter((c) => cards[c.code]?.seen && cards[c.code].due <= now).length
@@ -71,6 +73,19 @@ export default function Home({ go }: Props) {
           </div>
         </div>
       </div>
+
+      {fs.linked && fs.permission === 'prompt' && (
+        <div className="card row" style={{ borderColor: 'var(--yellow)' }}>
+          <span style={{ fontSize: '1.5rem' }}>💾</span>
+          <div className="grow">
+            <b>Reconnect your progress file</b>
+            <p className="muted small">Browsers need a click after each restart before the app can keep saving to {fs.name}.</p>
+          </div>
+          <button className="btn yellow sm" onClick={() => reconnect().catch(() => undefined)}>
+            Reconnect
+          </button>
+        </div>
+      )}
 
       <div className="stack">
         <button className="card row clickable" style={{ textAlign: 'left', cursor: 'pointer', width: '100%' }} onClick={() => go('practice')}>
