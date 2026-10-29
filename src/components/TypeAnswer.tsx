@@ -6,10 +6,11 @@ import { searchCountries } from '../lib/quiz'
 interface Props {
   disabled?: boolean
   onSubmit: (text: string) => void
+  onGiveUp: () => void
 }
 
 /** Type-the-country-name input with a small type-ahead list (Enter to submit). */
-export default function TypeAnswer({ disabled, onSubmit }: Props) {
+export default function TypeAnswer({ disabled, onSubmit, onGiveUp }: Props) {
   const [text, setText] = useState('')
   const [hits, setHits] = useState<Country[]>([])
   const [sel, setSel] = useState(0)
@@ -56,13 +57,29 @@ export default function TypeAnswer({ disabled, onSubmit }: Props) {
             e.preventDefault()
             setSel((s) => Math.max(0, s - 1))
           } else if (e.key === 'Escape') {
-            setHits([])
+            e.stopPropagation()
+            if (hits.length) setHits([])
+            else if (!text.trim()) onGiveUp()
+            else setText('')
           }
         }}
         aria-label="Country name"
       />
       <button className="btn blue" type="submit" disabled={disabled || !text.trim()}>
         Check
+      </button>
+      <button
+        className="btn idk-btn"
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          setText('')
+          setHits([])
+          onGiveUp()
+        }}
+        title="Reveal the answer (counts as a miss)"
+      >
+        🤷 I don't know
       </button>
       {hits.length > 0 && !disabled && (
         <div className="suggest" role="listbox">

@@ -215,7 +215,11 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
                 </button>
               </div>
             ) : (
-              <TypeAnswer disabled={phase === 'answered'} onSubmit={(text) => answer(isCorrectName(country, text), text)} />
+              <TypeAnswer
+                disabled={phase === 'answered'}
+                onSubmit={(text) => answer(isCorrectName(country, text), text)}
+                onGiveUp={() => answer(false, IDK)}
+              />
             )}
 
             {mode === 'test' && phase === 'answered' && (
@@ -244,7 +248,7 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
                   </>
                 ) : (
                   <>
-                    <kbd>Enter</kbd> to check · <kbd>↑</kbd><kbd>↓</kbd> to pick a suggestion
+                    <kbd>Enter</kbd> to check · <kbd>↑</kbd><kbd>↓</kbd> to pick a suggestion · <kbd>Esc</kbd> twice if you don't know
                   </>
                 )}
               </p>

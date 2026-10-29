@@ -217,7 +217,9 @@ img { display: block; }
 .choice.idk { position: relative; }
 .choice.idk .key { left: 16px; }
 
-.type-row { display: flex; gap: 10px; position: relative; }
+.type-row { display: flex; gap: 10px; position: relative; flex-wrap: wrap; }
+.type-row input { min-width: 200px; }
+.idk-btn { background: var(--surface-2); color: var(--text-2); text-transform: none; }
 .type-row input {
   flex: 1; font: inherit; font-weight: 700; font-size: 1.05rem; padding: 14px 16px; border-radius: 14px;
   border: 2px solid var(--border); background: var(--surface); color: var(--text); outline: none;
