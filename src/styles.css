@@ -212,6 +212,10 @@ img { display: block; }
 .choice.wrong { background: var(--red-soft); border-color: var(--red); color: var(--red-dark); }
 .choice:disabled { cursor: default; }
 .choice.dim { opacity: 0.5; }
+.choice.idk { grid-column: 1 / -1; justify-content: center; background: var(--surface-2); color: var(--text-2); font-size: 0.9rem; }
+.choice.idk .key { position: absolute; }
+.choice.idk { position: relative; }
+.choice.idk .key { left: 16px; }
 
 .type-row { display: flex; gap: 10px; position: relative; }
 .type-row input {

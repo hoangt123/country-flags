@@ -41,6 +41,9 @@ interface Item {
   retry: boolean
 }
 
+/** Sentinel for the "I don't know" choice. */
+const IDK = '__idk'
+
 export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabels, sound, title, onExit, onFinish }: Props) {
   const [items, setItems] = useState<Item[]>(() => queue.map((country) => ({ country, retry: false })))
   const [idx, setIdx] = useState(0)
@@ -116,9 +119,12 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName
-      if (phase === 'ask' && answerMode === 'choice' && /^[1-4]$/.test(e.key)) {
-        const c = choices[Number(e.key) - 1]
-        if (c) answer(c.code === country?.code, c.code)
+      if (phase === 'ask' && answerMode === 'choice' && /^[1-5]$/.test(e.key)) {
+        if (e.key === '5') answer(false, IDK)
+        else {
+          const c = choices[Number(e.key) - 1]
+          if (c) answer(c.code === country?.code, c.code)
+        }
       } else if (phase === 'answered' && (e.key === 'Enter' || e.key === ' ')) {
         if (tag === 'BUTTON' && e.key === ' ') return
         e.preventDefault()
@@ -140,7 +146,7 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
           ✅ Correct! +{xpFor(true, !item.retry)} XP{streak >= 3 ? ` · 🔥 ${streak} in a row` : ''}
         </>
       ) : (
-        <>❌ {answerMode === 'choice' ? 'Not quite' : `You wrote “${chosen}”`}</>
+        <>❌ {chosen === IDK ? 'Skipped — now you know it' : answerMode === 'choice' ? 'Not quite' : `You wrote “${chosen}”`}</>
       )}
     </div>
   )
@@ -199,6 +205,14 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
                     </button>
                   )
                 })}
+                <button
+                  className={`choice idk ${phase === 'answered' ? (chosen === IDK ? 'wrong' : 'dim') : ''}`}
+                  disabled={phase === 'answered'}
+                  onClick={() => answer(false, IDK)}
+                >
+                  <span className="key">5</span>
+                  <span>🤷 I don't know</span>
+                </button>
               </div>
             ) : (
               <TypeAnswer disabled={phase === 'answered'} onSubmit={(text) => answer(isCorrectName(country, text), text)} />
@@ -226,7 +240,7 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
               <p className="kbd" style={{ marginTop: 12 }}>
                 {answerMode === 'choice' ? (
                   <>
-                    Press <kbd>1</kbd>–<kbd>4</kbd> to answer
+                    Press <kbd>1</kbd>–<kbd>4</kbd> to answer, <kbd>5</kbd> if you don't know
                   </>
                 ) : (
                   <>
