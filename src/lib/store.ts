@@ -34,6 +34,8 @@ export interface Settings {
   sound: boolean
   neighborLabels: boolean
   showMap: boolean
+  /** Show country names under flags in the Practice lists. */
+  showNames: boolean
   /** Re-ask new and shaky flags a few cards later within a practice session. */
   reinforce: boolean
   sessionSize: number
@@ -75,6 +77,7 @@ export const defaultSettings: Settings = {
   sound: true,
   neighborLabels: true,
   showMap: true,
+  showNames: true,
   reinforce: true,
   sessionSize: 20,
   regions: [],

@@ -147,16 +147,26 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
   const fastSeen = FAST100.filter((c) => cards[c]?.seen).length
   const restSolid = REST.filter((c) => ['strong', 'mastered'].includes(masteryOf(cards[c]))).length
   const restSeen = REST.filter((c) => cards[c]?.seen).length
+  const namesToggle = (
+    <div className="seg">
+      <button className={settings.showNames ? 'on' : ''} onClick={() => store.updateSettings({ showNames: true })}>
+        Names on
+      </button>
+      <button className={!settings.showNames ? 'on' : ''} onClick={() => store.updateSettings({ showNames: false })}>
+        Names off
+      </button>
+    </div>
+  )
   const flagSection = (title: string, codes: string[]) => (
     <div key={title}>
       <p className="small" style={{ fontWeight: 900, marginBottom: 6 }}>
         {title} ({codes.length})
       </p>
-      <div className="flag-grid named">
+      <div className={`flag-grid named ${settings.showNames ? '' : 'hide-names'}`}>
         {codes.map((c) => (
-          <button key={c} className={`flag-tile m-${masteryOf(cards[c])}`} title={`${BY_CODE[c]?.name} — tap for details`} onClick={() => setDetail(c)}>
+          <button key={c} className={`flag-tile m-${masteryOf(cards[c])}`} title={settings.showNames ? `${BY_CODE[c]?.name} — tap for details` : 'Tap to reveal'} onClick={() => setDetail(c)}>
             <div className="fw">
-              <img src={flagUrl(c)} alt={BY_CODE[c]?.name} loading="lazy" />
+              <img src={flagUrl(c)} alt={settings.showNames ? BY_CODE[c]?.name : 'Flag'} loading="lazy" />
             </div>
             <div className="nm">{BY_CODE[c]?.name}</div>
           </button>
@@ -217,7 +227,10 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
 
       {focus === 'fast100' && (
         <div className="card stack">
-          <h3>The Fast 100</h3>
+          <div className="row spread">
+            <h3>The Fast 100</h3>
+            {namesToggle}
+          </div>
           <p className="muted small">
             Countries you are most likely to need, plus flags distinctive enough to stick after a look or two. Look-alike traps
             (Chad/Romania, Monaco, the Central American stripes…) are left for later. New flags arrive in this order; the border
@@ -228,11 +241,11 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
               <p className="small" style={{ fontWeight: 900, marginBottom: 6 }}>
                 {i + 1}. {t.title}
               </p>
-              <div className="flag-grid named">
+              <div className={`flag-grid named ${settings.showNames ? '' : 'hide-names'}`}>
                 {t.codes.map((c) => (
-                  <button key={c} className={`flag-tile m-${masteryOf(cards[c])}`} title={`${BY_CODE[c]?.name} — tap for details`} onClick={() => setDetail(c)}>
+                  <button key={c} className={`flag-tile m-${masteryOf(cards[c])}`} title={settings.showNames ? `${BY_CODE[c]?.name} — tap for details` : 'Tap to reveal'} onClick={() => setDetail(c)}>
                     <div className="fw">
-                      <img src={flagUrl(c)} alt={BY_CODE[c]?.name} loading="lazy" />
+                      <img src={flagUrl(c)} alt={settings.showNames ? BY_CODE[c]?.name : 'Flag'} loading="lazy" />
                     </div>
                     <div className="nm">{BY_CODE[c]?.name}</div>
                   </button>
@@ -245,7 +258,10 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
 
       {focus === 'rest' && (
         <div className="card stack">
-          <h3>The other {REST.length}</h3>
+          <div className="row spread">
+            <h3>The other {REST.length}</h3>
+            {namesToggle}
+          </div>
           <p className="muted small">
             Everything outside the Fast 100, grouped by region. This is where the look-alikes live, so expect it to take longer. New
             flags are introduced from the most populous country down. Tap a flag for its details.
@@ -256,7 +272,10 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
 
       {focus === 'all' && (
         <div className="card stack">
-          <h3>All {COUNTRIES.length} flags by region</h3>
+          <div className="row spread">
+            <h3>All {COUNTRIES.length} flags by region</h3>
+            {namesToggle}
+          </div>
           <p className="muted small">The border colour shows how well you know each one. Tap a flag for its details.</p>
           {REGIONS.filter((r) => settings.regions.length === 0 || settings.regions.includes(r)).map((r) =>
             flagSection(`${REGION_EMOJI[r]} ${r}`, COUNTRIES.filter((c) => c.region === r).map((c) => c.code)),
