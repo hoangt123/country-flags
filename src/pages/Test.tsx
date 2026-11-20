@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { COUNTRIES, REGION_EMOJI, REGIONS } from '../data'
+import { BY_CODE, COUNTRIES, REGION_EMOJI, REGIONS } from '../data'
+import { FAST100 } from '../data/fast100'
 import QuizRunner, { type QuizOutcome } from '../components/QuizRunner'
 import SessionSummary from '../components/SessionSummary'
 import { buildTestQueue, filterByRegions } from '../lib/quiz'
@@ -17,12 +18,13 @@ export const TEST_GOAL = 100
 export default function Test({ onPracticeMisses, onHome }: Props) {
   const { settings, tests } = useStore()
   const [regions, setRegions] = useState<string[]>([])
+  const [fast, setFast] = useState(false)
   const [queue, setQueue] = useState<Country[] | null>(null)
   const [outcome, setOutcome] = useState<QuizOutcome | null>(null)
   const [runKey, setRunKey] = useState(0)
 
-  const pool = useMemo(() => filterByRegions(regions), [regions])
-  const sizes = [25, 50, 100, pool.length]
+  const pool = useMemo(() => (fast ? FAST100.map((c) => BY_CODE[c]).filter(Boolean) : filterByRegions(regions)), [regions, fast])
+  const sizes = [...new Set([25, 50, 100, pool.length])].filter((n) => n <= pool.length)
   const size = Math.min(settings.testSize, pool.length)
   const best = tests.reduce((m, t) => Math.max(m, t.correct), 0)
 
@@ -41,7 +43,7 @@ export default function Test({ onPracticeMisses, onHome }: Props) {
       durationMs: o.durationMs,
       misses: o.misses,
       mode: settings.answerMode,
-      scope: regions.length ? regions.join(', ') : 'All regions',
+      scope: fast ? 'Fast 100' : regions.length ? regions.join(', ') : 'All regions',
     })
     setOutcome(o)
     setQueue(null)
@@ -101,7 +103,7 @@ export default function Test({ onPracticeMisses, onHome }: Props) {
         <div className="seg">
           {sizes.map((n, i) => (
             <button key={n} className={size === n ? 'on' : ''} onClick={() => store.updateSettings({ testSize: n })}>
-              {i === sizes.length - 1 ? `All ${n}` : n}
+              {i === sizes.length - 1 && n === pool.length ? `All ${n}` : n}
             </button>
           ))}
         </div>
@@ -111,20 +113,38 @@ export default function Test({ onPracticeMisses, onHome }: Props) {
       </div>
 
       <div className="card stack">
-        <h3>Regions</h3>
+        <h3>Which flags</h3>
         <div className="chips">
-          <button className={`chip ${regions.length === 0 ? 'on' : ''}`} onClick={() => setRegions([])}>
+          <button className={`chip ${fast ? 'on' : ''}`} onClick={() => setFast(true)}>
+            🚀 Fast 100
+          </button>
+          <button className={`chip ${!fast && regions.length === 0 ? 'on' : ''}`} onClick={() => { setFast(false); setRegions([]) }}>
             🌐 All ({COUNTRIES.length})
           </button>
           {REGIONS.map((r) => (
             <button
               key={r}
-              className={`chip ${regions.includes(r) ? 'on' : ''}`}
-              onClick={() => setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]))}
+              className={`chip ${!fast && regions.includes(r) ? 'on' : ''}`}
+              onClick={() => {
+                setFast(false)
+                setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]))
+              }}
             >
               {REGION_EMOJI[r]} {r}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="card stack">
+        <h3>Map hint</h3>
+        <div className="seg">
+          <button className={settings.showMap ? 'on' : ''} onClick={() => store.updateSettings({ showMap: true })}>
+            Show map
+          </button>
+          <button className={!settings.showMap ? 'on' : ''} onClick={() => store.updateSettings({ showMap: false })}>
+            Hide map (flag only)
+          </button>
         </div>
       </div>
 

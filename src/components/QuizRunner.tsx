@@ -57,7 +57,8 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
   const startRef = useRef(Date.now())
   const doneRef = useRef(false)
 
-  const { cards } = useStore()
+  const { cards, settings } = useStore()
+  const showMap = settings.showMap
   const item = items[idx]
   const country = item?.country
   const mastery = country ? masteryOf(cards[country.code]) : 'new'
@@ -160,6 +161,14 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
         <div className="progress" aria-label="Progress">
           <div style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
+        <button
+          className="chip"
+          onClick={() => store.updateSettings({ showMap: !showMap })}
+          title={showMap ? 'Hide the map hint' : 'Show the map hint'}
+          aria-pressed={showMap}
+        >
+          🗺️ {showMap ? 'Map on' : 'Map off'}
+        </button>
         <span className="score-badge">
           {mode === 'test' ? `${correctCount} ✓ · ${idx + 1}/${uniqueTotal}` : `${solved}/${uniqueTotal} · ${xp} XP`}
         </span>
@@ -170,11 +179,11 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
         <div className="flip-inner">
           {/* FRONT */}
           <div className="face front card" key={`front-${idx}`}>
-            <div className="flag-stage">
+            <div className={`flag-stage ${showMap ? '' : 'no-map'}`}>
               <div className={`flag-wrap ${phase === 'answered' && !lastCorrect ? 'shake' : ''}`}>
                 <img src={flagUrl(country.code)} alt="Flag to identify" draggable={false} />
               </div>
-              <LocatorMap country={country} showNeighborLabels={neighborLabels} />
+              {showMap && <LocatorMap country={country} showNeighborLabels={neighborLabels} />}
             </div>
             <p className="prompt row" style={{ gap: 10 }}>
               <span>{item.retry ? 'One more time — which country is this?' : 'Which country is this flag?'}</span>

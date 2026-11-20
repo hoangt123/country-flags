@@ -192,6 +192,8 @@ img { display: block; }
   display: grid; grid-template-columns: 1fr; gap: 14px; align-items: center;
 }
 @media (min-width: 720px) { .flag-stage { grid-template-columns: 1.15fr 1fr; } }
+.flag-stage.no-map { grid-template-columns: 1fr; justify-items: center; }
+.flag-stage.no-map .flag-wrap { width: 100%; max-width: 520px; }
 .flag-wrap { position: relative; border-radius: 12px; overflow: hidden; border: 2px solid var(--border); background: var(--surface-2); aspect-ratio: 4/3; box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
 .flag-wrap img { width: 100%; height: 100%; object-fit: fill; }
 .flag-wrap.sm { aspect-ratio: 4/3; width: 96px; box-shadow: none; }
@@ -286,6 +288,8 @@ img { display: block; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; }
 
 .flag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; }
+.flag-grid.mini { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+.flag-grid.mini .fw { border-width: 2px; border-radius: 5px; }
 .flag-tile { background: none; border: 0; padding: 0; cursor: pointer; text-align: center; }
 .flag-tile .fw { border-radius: 8px; overflow: hidden; border: 3px solid var(--border); aspect-ratio: 4/3; background: var(--surface-2); }
 .flag-tile .fw img { width: 100%; height: 100%; }

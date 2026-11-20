@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { store } from '../lib/store'
+import { listSnapshots, store } from '../lib/store'
 import { linkExistingFile, linkNewFile, reconnect, unlink, useFileSync } from '../lib/fileSync'
 import { dayKey } from '../lib/format'
 
@@ -8,6 +8,7 @@ export default function DataCard() {
   const fs = useFileSync()
   const fileRef = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [snaps, setSnaps] = useState(listSnapshots)
 
   const run = async (fn: () => Promise<void>, okMsg: string) => {
     setMsg(null)
@@ -90,14 +91,45 @@ export default function DataCard() {
         </button>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])} />
         <button
-          className="btn sm red"
+          className="btn sm yellow"
           onClick={() => {
-            if (confirm('Reset all progress? This cannot be undone.')) store.resetProgress()
+            if (confirm('Start a fresh round? Your current progress is archived first and can be restored below.')) {
+              store.startFresh()
+              setSnaps(listSnapshots())
+              setMsg('Fresh round started. The previous round is archived below.')
+            }
           }}
         >
-          Reset
+          Start fresh round
         </button>
       </div>
+      {snaps.length > 0 && (
+        <div className="stack" style={{ gap: 6 }}>
+          <p className="small" style={{ fontWeight: 900 }}>Archived rounds</p>
+          {snaps
+            .slice()
+            .reverse()
+            .map((s) => (
+              <div key={s.id} className="list-item">
+                <div className="grow small">
+                  <b>{new Date(s.date).toLocaleString()}</b>
+                  <div className="muted">{s.label}</div>
+                </div>
+                <button
+                  className="btn sm"
+                  onClick={() => {
+                    if (confirm('Restore this round? It replaces the current progress.')) {
+                      store.restoreSnapshot(s.id)
+                      setMsg('Round restored.')
+                    }
+                  }}
+                >
+                  Restore
+                </button>
+              </div>
+            ))}
+        </div>
+      )}
       <p className="muted small">Importing merges: nothing already in the app is lost, and the newer record wins for each flag.</p>
       {(msg || fs.error) && <p className="small" style={{ color: fs.error ? 'var(--red-dark)' : 'var(--green-dark)' }}>{fs.error ?? msg}</p>}
     </div>

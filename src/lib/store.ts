@@ -33,6 +33,7 @@ export interface Settings {
   answerMode: AnswerMode
   sound: boolean
   neighborLabels: boolean
+  showMap: boolean
   sessionSize: number
   regions: string[] // empty = all
   testSize: number
@@ -50,11 +51,28 @@ export interface State {
 }
 
 const KEY = 'flagquest.v1'
+const SNAP_KEY = 'flagquest.snapshots'
+
+export interface Snapshot {
+  id: string
+  date: number
+  label: string
+  state: State
+}
+
+export function listSnapshots(): Snapshot[] {
+  try {
+    return JSON.parse(localStorage.getItem(SNAP_KEY) ?? '[]') as Snapshot[]
+  } catch {
+    return []
+  }
+}
 
 export const defaultSettings: Settings = {
   answerMode: 'choice',
   sound: true,
   neighborLabels: true,
+  showMap: true,
   sessionSize: 20,
   regions: [],
   testSize: 100,
@@ -166,6 +184,28 @@ export const store = {
   },
   resetProgress() {
     set((s) => ({ ...s, cards: {}, tests: [], sessions: [], days: {} }))
+  },
+  /**
+   * Archive the current progress as a restorable snapshot, then clear cards,
+   * tests, sessions and days. Settings are kept.
+   */
+  startFresh(): Snapshot {
+    const snap: Snapshot = {
+      id: String(Date.now()),
+      date: Date.now(),
+      label: `${Object.values(state.cards).filter((c) => c.seen > 0).length} flags studied · ${state.tests.length} tests`,
+      state,
+    }
+    localStorage.setItem(SNAP_KEY, JSON.stringify([...listSnapshots(), snap].slice(-10)))
+    set((s) => ({ ...s, cards: {}, tests: [], sessions: [], days: {} }))
+    return snap
+  },
+  /** Bring back an archived round, replacing what is there now (settings kept). */
+  restoreSnapshot(id: string) {
+    const snap = listSnapshots().find((x) => x.id === id)
+    if (!snap) throw new Error('Snapshot not found')
+    const old = parseState(snap.state)
+    set((s) => ({ ...old, settings: s.settings }))
   },
   exportJSON(): string {
     return JSON.stringify(state, null, 2)

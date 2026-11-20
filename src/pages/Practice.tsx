@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { BY_CODE, COUNTRIES, REGION_EMOJI, REGIONS } from '../data'
 import { SIMILAR_GROUPS } from '../data/similar'
+import { FAST100, FAST100_TIERS } from '../data/fast100'
+import { flagUrl } from '../lib/flags'
 import QuizRunner, { type QuizOutcome } from '../components/QuizRunner'
 import SessionSummary from '../components/SessionSummary'
 import { buildPracticeQueue, filterByRegions } from '../lib/quiz'
@@ -8,7 +10,7 @@ import { store, useStore } from '../lib/store'
 import { masteryOf, priority } from '../lib/srs'
 import { shuffle } from '../lib/format'
 
-type Focus = 'smart' | 'new' | 'weak' | 'lookalikes' | 'all'
+type Focus = 'fast100' | 'smart' | 'new' | 'weak' | 'lookalikes' | 'all'
 
 interface Props {
   seed: string[] | null // specific codes to drill (e.g. misses from a test)
@@ -41,7 +43,17 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
   const start = () => {
     const size = settings.sessionSize
     let picked: string[]
-    if (focus === 'lookalikes') {
+    if (focus === 'fast100') {
+      // New flags are introduced easiest-first; the rest of the session reviews
+      // Fast 100 flags already seen, weighted toward the shaky ones.
+      const pool = FAST100.map((c) => BY_CODE[c]).filter(Boolean)
+      const seen = pool.filter((c) => cards[c.code]?.seen)
+      const unseen = pool.filter((c) => !cards[c.code]?.seen)
+      const shaky = seen.filter((c) => cards[c.code].box <= 2 || cards[c.code].due <= Date.now()).length
+      const nNew = Math.min(unseen.length, shaky >= size / 2 ? Math.ceil(size / 2) : size - shaky)
+      const review = buildPracticeQueue(seen, cards, size - nNew)
+      picked = shuffle([...unseen.slice(0, nNew), ...review]).map((c) => c.code)
+    } else if (focus === 'lookalikes') {
       const g = SIMILAR_GROUPS.find((g) => g.id === group)!
       picked = shuffle(g.codes.filter((c) => BY_CODE[c]))
     } else if (focus === 'new') {
@@ -72,6 +84,7 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
 
   const scopeLabel = () => {
     if (seed) return 'Review'
+    if (focus === 'fast100') return 'Fast 100'
     if (focus === 'lookalikes') return SIMILAR_GROUPS.find((g) => g.id === group)?.title ?? 'Look-alikes'
     return settings.regions.length ? settings.regions.join(', ') : 'All regions'
   }
@@ -83,7 +96,7 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
         <QuizRunner
           key={runKey}
           queue={q}
-          pool={focus === 'lookalikes' && !seed ? COUNTRIES : regionPool}
+          pool={(focus === 'lookalikes' || focus === 'fast100') && !seed ? COUNTRIES : regionPool}
           mode="practice"
           answerMode={settings.answerMode}
           neighborLabels={settings.neighborLabels}
@@ -118,7 +131,10 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
     )
   }
 
+  const fastSolid = FAST100.filter((c) => ['strong', 'mastered'].includes(masteryOf(cards[c]))).length
+  const fastSeen = FAST100.filter((c) => cards[c]?.seen).length
   const focusOptions: { id: Focus; label: string; desc: string }[] = [
+    { id: 'fast100', label: '🚀 Fast 100', desc: `${fastSolid}/100 solid · ${fastSeen}/100 seen — the quickest route to 100: famous countries and unmistakable flags, easiest first` },
     { id: 'smart', label: '🧠 Smart review', desc: `${counts.due} due · ${counts.weak} shaky · ${counts.fresh} new — weak flags show up to 10× more often than mastered ones` },
     { id: 'new', label: '✨ New flags', desc: `${counts.fresh} flags you haven't seen yet` },
     { id: 'weak', label: '🎯 Trouble flags', desc: `${counts.weak} flags you keep missing` },
@@ -167,7 +183,34 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
         )}
       </div>
 
-      {focus !== 'lookalikes' && (
+      {focus === 'fast100' && (
+        <div className="card stack">
+          <h3>The Fast 100</h3>
+          <p className="muted small">
+            Countries you are most likely to need, plus flags distinctive enough to stick after a look or two. Look-alike traps
+            (Chad/Romania, Monaco, the Central American stripes…) are left for later. New flags arrive in this order; the border
+            colour shows how well you know each one.
+          </p>
+          {FAST100_TIERS.map((t, i) => (
+            <div key={t.title}>
+              <p className="small" style={{ fontWeight: 900, marginBottom: 6 }}>
+                {i + 1}. {t.title}
+              </p>
+              <div className="flag-grid mini">
+                {t.codes.map((c) => (
+                  <div key={c} className={`flag-tile m-${masteryOf(cards[c])}`} title={BY_CODE[c]?.name}>
+                    <div className="fw">
+                      <img src={flagUrl(c)} alt={BY_CODE[c]?.name} loading="lazy" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {focus !== 'lookalikes' && focus !== 'fast100' && (
         <div className="card stack">
           <h3>Regions</h3>
           <div className="chips">
@@ -203,6 +246,17 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
             </button>
             <button className={settings.answerMode === 'type' ? 'on' : ''} onClick={() => store.updateSettings({ answerMode: 'type' })}>
               Type it
+            </button>
+          </div>
+        </div>
+        <div className="row spread">
+          <span>Map on the question side</span>
+          <div className="seg">
+            <button className={settings.showMap ? 'on' : ''} onClick={() => store.updateSettings({ showMap: true })}>
+              Show
+            </button>
+            <button className={!settings.showMap ? 'on' : ''} onClick={() => store.updateSettings({ showMap: false })}>
+              Hide
             </button>
           </div>
         </div>
