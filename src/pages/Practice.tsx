@@ -11,7 +11,12 @@ import { store, useStore } from '../lib/store'
 import { masteryOf, priority } from '../lib/srs'
 import { shuffle } from '../lib/format'
 
-type Focus = 'fast100' | 'smart' | 'new' | 'weak' | 'lookalikes' | 'all'
+/** Every flag not in the Fast 100, most populous first (the order new ones are introduced). */
+const REST: string[] = COUNTRIES.filter((c) => !FAST100.includes(c.code))
+  .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
+  .map((c) => c.code)
+
+type Focus = 'fast100' | 'rest' | 'smart' | 'new' | 'weak' | 'lookalikes' | 'all'
 
 interface Props {
   seed: string[] | null // specific codes to drill (e.g. misses from a test)
@@ -44,14 +49,15 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
   }
 
   const start = () => {
-    const size = focus === 'fast100' && all100 ? FAST100.length : settings.sessionSize
+    const curated = focus === 'fast100' ? FAST100 : focus === 'rest' ? REST : null
+    const size = curated && all100 ? curated.length : settings.sessionSize
     let picked: string[]
-    if (focus === 'fast100' && all100) {
-      picked = shuffle(FAST100.filter((c) => BY_CODE[c]))
-    } else if (focus === 'fast100') {
+    if (curated && all100) {
+      picked = shuffle(curated.filter((c) => BY_CODE[c]))
+    } else if (curated) {
       // New flags are introduced easiest-first; the rest of the session reviews
       // Fast 100 flags already seen, weighted toward the shaky ones.
-      const pool = FAST100.map((c) => BY_CODE[c]).filter(Boolean)
+      const pool = curated.map((c) => BY_CODE[c]).filter(Boolean)
       const seen = pool.filter((c) => cards[c.code]?.seen)
       const unseen = pool.filter((c) => !cards[c.code]?.seen)
       const shaky = seen.filter((c) => cards[c.code].box <= 2 || cards[c.code].due <= Date.now()).length
@@ -90,6 +96,7 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
   const scopeLabel = () => {
     if (seed) return 'Review'
     if (focus === 'fast100') return 'Fast 100'
+    if (focus === 'rest') return `The other ${REST.length}`
     if (focus === 'lookalikes') return SIMILAR_GROUPS.find((g) => g.id === group)?.title ?? 'Look-alikes'
     return settings.regions.length ? settings.regions.join(', ') : 'All regions'
   }
@@ -101,7 +108,7 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
         <QuizRunner
           key={runKey}
           queue={q}
-          pool={(focus === 'lookalikes' || focus === 'fast100') && !seed ? COUNTRIES : regionPool}
+          pool={(focus === 'lookalikes' || focus === 'fast100' || focus === 'rest') && !seed ? COUNTRIES : regionPool}
           mode="practice"
           answerMode={settings.answerMode}
           neighborLabels={settings.neighborLabels}
@@ -138,13 +145,33 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
 
   const fastSolid = FAST100.filter((c) => ['strong', 'mastered'].includes(masteryOf(cards[c]))).length
   const fastSeen = FAST100.filter((c) => cards[c]?.seen).length
+  const restSolid = REST.filter((c) => ['strong', 'mastered'].includes(masteryOf(cards[c]))).length
+  const restSeen = REST.filter((c) => cards[c]?.seen).length
+  const flagSection = (title: string, codes: string[]) => (
+    <div key={title}>
+      <p className="small" style={{ fontWeight: 900, marginBottom: 6 }}>
+        {title} ({codes.length})
+      </p>
+      <div className="flag-grid named">
+        {codes.map((c) => (
+          <button key={c} className={`flag-tile m-${masteryOf(cards[c])}`} title={`${BY_CODE[c]?.name} — tap for details`} onClick={() => setDetail(c)}>
+            <div className="fw">
+              <img src={flagUrl(c)} alt={BY_CODE[c]?.name} loading="lazy" />
+            </div>
+            <div className="nm">{BY_CODE[c]?.name}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
   const focusOptions: { id: Focus; label: string; desc: string }[] = [
     { id: 'fast100', label: '🚀 Fast 100', desc: `${fastSolid}/100 solid · ${fastSeen}/100 seen — the quickest route to 100: famous countries and unmistakable flags, easiest first` },
+    { id: 'rest', label: `🧭 The other ${REST.length}`, desc: `${restSolid}/${REST.length} solid · ${restSeen}/${REST.length} seen — every flag not in the Fast 100, bigger countries first` },
     { id: 'smart', label: '🧠 Smart review', desc: `${counts.due} due · ${counts.weak} shaky · ${counts.fresh} new — weak flags show up to 10× more often than mastered ones` },
     { id: 'new', label: '✨ New flags', desc: `${counts.fresh} flags you haven't seen yet` },
     { id: 'weak', label: '🎯 Trouble flags', desc: `${counts.weak} flags you keep missing` },
     { id: 'lookalikes', label: '👯 Look-alikes', desc: 'Drill a set of easily confused flags' },
-    { id: 'all', label: '🎲 Random mix', desc: 'Anything goes' },
+    { id: 'all', label: '🎲 Random mix', desc: `Anything goes — all ${COUNTRIES.length} flags, listed below by region` },
   ]
 
   return (
@@ -216,7 +243,28 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
         </div>
       )}
 
-      {focus !== 'lookalikes' && focus !== 'fast100' && (
+      {focus === 'rest' && (
+        <div className="card stack">
+          <h3>The other {REST.length}</h3>
+          <p className="muted small">
+            Everything outside the Fast 100, grouped by region. This is where the look-alikes live, so expect it to take longer. New
+            flags are introduced from the most populous country down. Tap a flag for its details.
+          </p>
+          {REGIONS.map((r) => flagSection(`${REGION_EMOJI[r]} ${r}`, REST.filter((c) => BY_CODE[c].region === r).sort((a, b) => BY_CODE[a].name.localeCompare(BY_CODE[b].name))))}
+        </div>
+      )}
+
+      {focus === 'all' && (
+        <div className="card stack">
+          <h3>All {COUNTRIES.length} flags by region</h3>
+          <p className="muted small">The border colour shows how well you know each one. Tap a flag for its details.</p>
+          {REGIONS.filter((r) => settings.regions.length === 0 || settings.regions.includes(r)).map((r) =>
+            flagSection(`${REGION_EMOJI[r]} ${r}`, COUNTRIES.filter((c) => c.region === r).map((c) => c.code)),
+          )}
+        </div>
+      )}
+
+      {focus !== 'lookalikes' && focus !== 'fast100' && focus !== 'rest' && (
         <div className="card stack">
           <h3>Regions</h3>
           <div className="chips">
@@ -240,7 +288,7 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
             {[10, 20, 40].map((n) => (
               <button
                 key={n}
-                className={settings.sessionSize === n && !(focus === 'fast100' && all100) ? 'on' : ''}
+                className={settings.sessionSize === n && !((focus === 'fast100' || focus === 'rest') && all100) ? 'on' : ''}
                 onClick={() => {
                   setAll100(false)
                   store.updateSettings({ sessionSize: n })
@@ -249,9 +297,9 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
                 {n}
               </button>
             ))}
-            {focus === 'fast100' && (
+            {(focus === 'fast100' || focus === 'rest') && (
               <button className={all100 ? 'on' : ''} onClick={() => setAll100(true)}>
-                All 100
+                All {focus === 'fast100' ? FAST100.length : REST.length}
               </button>
             )}
           </div>
