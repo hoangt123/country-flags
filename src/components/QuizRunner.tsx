@@ -63,8 +63,29 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
   const country = item?.country
   const mastery = country ? masteryOf(cards[country.code]) : 'new'
   const uniqueTotal = queue.length
-  const solved = useMemo(() => new Set(answers.filter((a) => a.correct).map((a) => a.code)).size, [answers])
-  const progress = mode === 'practice' ? solved / uniqueTotal : idx / uniqueTotal
+  // Practice: how many more correct answers each flag needs this session. New and
+  // shaky flags need two (spaced a few cards apart) when reinforcement is on.
+  const [initialNeed] = useState<Record<string, number>>(() => {
+    const st = store.get()
+    const out: Record<string, number> = {}
+    for (const c of queue) {
+      const stat = st.cards[c.code]
+      out[c.code] = st.settings.reinforce && (!stat || stat.seen === 0 || stat.box <= 1) ? 2 : 1
+    }
+    return out
+  })
+  const [need, setNeed] = useState<Record<string, number>>(initialNeed)
+  const solved = useMemo(() => Object.values(need).filter((n) => n <= 0).length, [need])
+  const progress = useMemo(() => {
+    if (mode !== 'practice') return idx / uniqueTotal
+    let total = 0
+    let left = 0
+    for (const [code, init] of Object.entries(initialNeed)) {
+      total += init
+      left += Math.min(init, Math.max(0, need[code] ?? 0))
+    }
+    return total ? (total - left) / total : 0
+  }, [mode, idx, uniqueTotal, initialNeed, need])
 
   const choices = useMemo(() => (country && answerMode === 'choice' ? makeChoices(country, pool) : []), [country, pool, answerMode])
 
@@ -84,12 +105,24 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
       if (firstTry) store.recordAnswer(country.code, correct, gained)
       if (sound) (correct ? playCorrect : playWrong)()
       if (mode === 'practice') setFlipped(true)
-      if (mode === 'practice' && !correct) {
-        // Duolingo-style: missed cards come back later in the same session.
-        setItems((list) => [...list, { country, retry: true }])
+      if (mode === 'practice') {
+        // Interleaved repetition: a miss comes back 3–6 cards later, and a flag that
+        // still needs another correct answer comes back 6–11 cards later, so flags
+        // resurface several times before the session ends.
+        const cur = need[country.code] ?? 1
+        const left = correct ? cur - 1 : settings.reinforce ? 2 : 1
+        setNeed((n) => ({ ...n, [country.code]: left }))
+        if (left > 0) {
+          const gap = correct ? 6 + Math.floor(Math.random() * 6) : 3 + Math.floor(Math.random() * 4)
+          setItems((list) => {
+            const copy = list.slice()
+            copy.splice(Math.min(copy.length, idx + 1 + gap), 0, { country, retry: true })
+            return copy
+          })
+        }
       }
     },
-    [country, item, phase, mode, sound],
+    [country, item, phase, mode, sound, need, idx, settings.reinforce],
   )
 
   const next = useCallback(() => {
@@ -186,7 +219,7 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
               {showMap && <LocatorMap country={country} showNeighborLabels={neighborLabels} />}
             </div>
             <p className="prompt row" style={{ gap: 10 }}>
-              <span>{item.retry ? 'One more time — which country is this?' : 'Which country is this flag?'}</span>
+              <span>{item.retry ? 'Again — which country is this?' : 'Which country is this flag?'}</span>
               {mode === 'practice' && !item.retry && <span className={`pill ${mastery}`}>{mastery === 'new' ? 'New flag' : MASTERY_LABEL[mastery]}</span>}
             </p>
             {answerMode === 'choice' ? (

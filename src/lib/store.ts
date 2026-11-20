@@ -34,6 +34,8 @@ export interface Settings {
   sound: boolean
   neighborLabels: boolean
   showMap: boolean
+  /** Re-ask new and shaky flags a few cards later within a practice session. */
+  reinforce: boolean
   sessionSize: number
   regions: string[] // empty = all
   testSize: number
@@ -73,6 +75,7 @@ export const defaultSettings: Settings = {
   sound: true,
   neighborLabels: true,
   showMap: true,
+  reinforce: true,
   sessionSize: 20,
   regions: [],
   testSize: 100,

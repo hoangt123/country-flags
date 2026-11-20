@@ -3,6 +3,7 @@ import { BY_CODE, COUNTRIES, REGION_EMOJI, REGIONS } from '../data'
 import { SIMILAR_GROUPS } from '../data/similar'
 import { FAST100, FAST100_TIERS } from '../data/fast100'
 import { flagUrl } from '../lib/flags'
+import CountryModal from '../components/CountryModal'
 import QuizRunner, { type QuizOutcome } from '../components/QuizRunner'
 import SessionSummary from '../components/SessionSummary'
 import { buildPracticeQueue, filterByRegions } from '../lib/quiz'
@@ -22,6 +23,8 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
   const { settings, cards } = useStore()
   const [focus, setFocus] = useState<Focus>('smart')
   const [group, setGroup] = useState(SIMILAR_GROUPS[0].id)
+  const [all100, setAll100] = useState(false)
+  const [detail, setDetail] = useState<string | null>(null)
   const [queue, setQueue] = useState<string[] | null>(seed)
   const [outcome, setOutcome] = useState<QuizOutcome | null>(null)
   const [runKey, setRunKey] = useState(0)
@@ -41,9 +44,11 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
   }
 
   const start = () => {
-    const size = settings.sessionSize
+    const size = focus === 'fast100' && all100 ? FAST100.length : settings.sessionSize
     let picked: string[]
-    if (focus === 'fast100') {
+    if (focus === 'fast100' && all100) {
+      picked = shuffle(FAST100.filter((c) => BY_CODE[c]))
+    } else if (focus === 'fast100') {
       // New flags are introduced easiest-first; the rest of the session reviews
       // Fast 100 flags already seen, weighted toward the shaky ones.
       const pool = FAST100.map((c) => BY_CODE[c]).filter(Boolean)
@@ -196,13 +201,14 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
               <p className="small" style={{ fontWeight: 900, marginBottom: 6 }}>
                 {i + 1}. {t.title}
               </p>
-              <div className="flag-grid mini">
+              <div className="flag-grid named">
                 {t.codes.map((c) => (
-                  <div key={c} className={`flag-tile m-${masteryOf(cards[c])}`} title={BY_CODE[c]?.name}>
+                  <button key={c} className={`flag-tile m-${masteryOf(cards[c])}`} title={`${BY_CODE[c]?.name} — tap for details`} onClick={() => setDetail(c)}>
                     <div className="fw">
                       <img src={flagUrl(c)} alt={BY_CODE[c]?.name} loading="lazy" />
                     </div>
-                  </div>
+                    <div className="nm">{BY_CODE[c]?.name}</div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -232,10 +238,33 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
           <span>Cards per session</span>
           <div className="seg">
             {[10, 20, 40].map((n) => (
-              <button key={n} className={settings.sessionSize === n ? 'on' : ''} onClick={() => store.updateSettings({ sessionSize: n })}>
+              <button
+                key={n}
+                className={settings.sessionSize === n && !(focus === 'fast100' && all100) ? 'on' : ''}
+                onClick={() => {
+                  setAll100(false)
+                  store.updateSettings({ sessionSize: n })
+                }}
+              >
                 {n}
               </button>
             ))}
+            {focus === 'fast100' && (
+              <button className={all100 ? 'on' : ''} onClick={() => setAll100(true)}>
+                All 100
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="row spread">
+          <span>Repeat new and shaky flags within a session</span>
+          <div className="seg">
+            <button className={settings.reinforce ? 'on' : ''} onClick={() => store.updateSettings({ reinforce: true })}>
+              On
+            </button>
+            <button className={!settings.reinforce ? 'on' : ''} onClick={() => store.updateSettings({ reinforce: false })}>
+              Off
+            </button>
           </div>
         </div>
         <div className="row spread">
@@ -276,13 +305,14 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
       <button className="btn primary lg block" onClick={start}>
         Start practice
       </button>
+      {detail && <CountryModal code={detail} onClose={() => setDetail(null)} />}
 
       <div className="card stack">
         <h3>How cards are chosen</h3>
         <ul className="muted small" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>
           <li>Every answer moves a flag between six levels. A correct answer promotes it one level and schedules the next review further out (10 min → 1 day → 3 days → 1 week → 3 weeks); a miss drops it back to the bottom.</li>
           <li>Smart review fills a session with everything that is due, then runs a weighted lottery for the rest: "needs work" flags carry weight 10, new flags 4, mastered flags 1, and anything overdue is tripled.</li>
-          <li>Within a session, a missed flag is re-asked later until you get it right. Only your first attempt counts toward its level.</li>
+          <li>Within a session, flags resurface instead of cycling once: a miss returns 3–6 cards later, and a new or shaky flag returns 6–11 cards after a correct answer until you have it right twice. Only your first attempt counts toward its level.</li>
           <li>Test mode ignores all of this and picks flags uniformly at random, so scores are comparable over time.</li>
         </ul>
       </div>
