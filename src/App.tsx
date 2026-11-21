@@ -43,6 +43,7 @@ export default function App() {
     window.scrollTo({ top: 0 })
   }, [])
 
+  const [testPreset, setTestPreset] = useState<'fast100' | null>(null)
   const practiceMisses = useCallback(
     (codes: string[]) => {
       setPracticeSeed(codes)
@@ -68,8 +69,8 @@ export default function App() {
       </nav>
       <main className="grow">
         {route === 'home' && <Home go={go} />}
-        {route === 'practice' && <Practice key={practiceSeed ? practiceSeed.join(',') : 'default'} seed={practiceSeed} onClearSeed={() => setPracticeSeed(null)} onHome={() => go('home')} />}
-        {route === 'test' && <Test onPracticeMisses={practiceMisses} onHome={() => go('home')} />}
+        {route === 'practice' && <Practice key={practiceSeed ? practiceSeed.join(',') : 'default'} seed={practiceSeed} onClearSeed={() => setPracticeSeed(null)} onHome={() => go('home')} onTestFast100={() => { setTestPreset('fast100'); go('test') }} />}
+        {route === 'test' && <Test preset={testPreset} onClearPreset={() => setTestPreset(null)} onPracticeMisses={practiceMisses} onHome={() => go('home')} />}
         {route === 'learn' && <Learn />}
         {route === 'progress' && <Progress />}
       </main>

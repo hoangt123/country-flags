@@ -24,18 +24,53 @@ export function isCorrectName(c: Country, typed: string): boolean {
   return c.aliases.some((a) => normalizeName(a) === t)
 }
 
-/** Search countries by prefix / substring for the type-ahead input. */
-export function searchCountries(q: string, limit = 6): Country[] {
-  const t = normalizeName(q)
-  if (!t) return []
-  const starts: Country[] = []
-  const contains: Country[] = []
-  for (const c of COUNTRIES) {
-    const names = [c.name, ...c.aliases].map(normalizeName)
-    if (names.some((n) => n.startsWith(t))) starts.push(c)
-    else if (names.some((n) => n.includes(t))) contains.push(c)
+/** Damerau–Levenshtein distance (insert, delete, substitute, swap neighbours). */
+export function editDistance(a: string, b: string): number {
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...new Array<number>(b.length).fill(0)])
+  for (let j = 0; j <= b.length; j++) d[0][j] = j
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
+    }
   }
-  return [...starts, ...contains].slice(0, limit)
+  return d[a.length][b.length]
+}
+
+/** Typos allowed for a name of this length: none for very short names (Iran/Iraq, Mali/Malta). */
+function tolerance(len: number): number {
+  return len <= 4 ? 0 : len <= 8 ? 1 : 2
+}
+
+function bestDistance(c: Country, t: string): number {
+  let best = Infinity
+  for (const n of [c.name, ...c.aliases]) {
+    const norm = normalizeName(n)
+    const dist = editDistance(t, norm)
+    if (dist <= tolerance(norm.length)) best = Math.min(best, dist)
+  }
+  return best
+}
+
+export type NameMatch = 'exact' | 'close' | 'wrong'
+
+/**
+ * Grade a typed answer. "close" means a small misspelling that is still
+ * unambiguously this country: it must be nearer to this country's name than to
+ * any other country's (so "Nigera" is not accepted for Niger or Nigeria).
+ */
+export function matchName(c: Country, typed: string): NameMatch {
+  const t = normalizeName(typed)
+  if (!t) return 'wrong'
+  if (isCorrectName(c, typed)) return 'exact'
+  const mine = bestDistance(c, t)
+  if (mine === Infinity) return 'wrong'
+  for (const other of COUNTRIES) {
+    if (other.code === c.code) continue
+    if (isCorrectName(other, typed) || bestDistance(other, t) <= mine) return 'wrong'
+  }
+  return 'close'
 }
 
 /** Pick 3 distractors: look-alike flags first, then same subregion, region, then anything. */

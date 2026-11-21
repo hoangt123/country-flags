@@ -22,9 +22,10 @@ interface Props {
   seed: string[] | null // specific codes to drill (e.g. misses from a test)
   onClearSeed: () => void
   onHome: () => void
+  onTestFast100: () => void
 }
 
-export default function Practice({ seed, onClearSeed, onHome }: Props) {
+export default function Practice({ seed, onClearSeed, onHome, onTestFast100 }: Props) {
   const { settings, cards } = useStore()
   const [focus, setFocus] = useState<Focus>('smart')
   const [group, setGroup] = useState(SIMILAR_GROUPS[0].id)
@@ -236,6 +237,9 @@ export default function Practice({ seed, onClearSeed, onHome }: Props) {
             (Chad/Romania, Monaco, the Central American stripes…) are left for later. New flags arrive in this order; the border
             colour shows how well you know each one.
           </p>
+          <button className="btn blue block" onClick={onTestFast100}>
+            🎯 Test me on all 100
+          </button>
           {FAST100_TIERS.map((t, i) => (
             <div key={t.title}>
               <p className="small" style={{ fontWeight: 900, marginBottom: 6 }}>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Country } from '../data'
 import { flagUrl } from '../lib/flags'
-import { isCorrectName, makeChoices, xpFor } from '../lib/quiz'
+import { matchName, makeChoices, xpFor } from '../lib/quiz'
 import { playCorrect, playWrong } from '../lib/audio'
 import { store, useStore, type AnswerMode } from '../lib/store'
 import { masteryOf, MASTERY_LABEL } from '../lib/srs'
@@ -51,6 +51,7 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
   const [flipped, setFlipped] = useState(false)
   const [chosen, setChosen] = useState<string | null>(null) // code chosen (choice mode) or typed text
   const [lastCorrect, setLastCorrect] = useState(false)
+  const [typo, setTypo] = useState<string | null>(null) // what the user typed when a misspelling was accepted
   const [answers, setAnswers] = useState<QuizAnswer[]>([])
   const [xp, setXp] = useState(0)
   const [streak, setStreak] = useState(0)
@@ -144,6 +145,7 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
     }
     setFlipped(false)
     setChosen(null)
+    setTypo(null)
     setPhase('ask')
     // let the flip-back animation start before swapping content
     setTimeout(() => setIdx((i) => i + 1), flipped ? 160 : 0)
@@ -178,6 +180,12 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
       {lastCorrect ? (
         <>
           ✅ Correct! +{xpFor(true, !item.retry)} XP{streak >= 3 ? ` · 🔥 ${streak} in a row` : ''}
+          {typo && (
+            <span style={{ fontWeight: 700 }}>
+              {' '}
+              · spelling: “{typo}” → <b>{country.name}</b>
+            </span>
+          )}
         </>
       ) : (
         <>❌ {chosen === IDK ? 'Skipped — now you know it' : answerMode === 'choice' ? 'Not quite' : `You wrote “${chosen}”`}</>
@@ -203,7 +211,7 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
           🗺️ {showMap ? 'Map on' : 'Map off'}
         </button>
         <span className="score-badge">
-          {mode === 'test' ? `${correctCount} ✓ · ${idx + 1}/${uniqueTotal}` : `${solved}/${uniqueTotal} · ${xp} XP`}
+          {mode === 'test' ? `${correctCount} ✓ · ${idx + 1}/${uniqueTotal}` : `✓ ${answers.filter((a) => a.correct).length}  ✗ ${answers.filter((a) => !a.correct).length} · ${solved}/${uniqueTotal} learned · ${xp} XP`}
         </span>
       </div>
       {title && <p className="muted small" style={{ marginBottom: 8 }}>{title}</p>}
@@ -259,7 +267,11 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
             ) : (
               <TypeAnswer
                 disabled={phase === 'answered'}
-                onSubmit={(text) => answer(isCorrectName(country, text), text)}
+                onSubmit={(text) => {
+                  const m = matchName(country, text)
+                  setTypo(m === 'close' ? text.trim() : null)
+                  answer(m !== 'wrong', text)
+                }}
                 onGiveUp={() => answer(false, IDK)}
               />
             )}
@@ -268,6 +280,12 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
               <div className={`feedback ${lastCorrect ? 'ok' : 'bad'} pop`}>
                 <div className="body">
                   <div className="title">{lastCorrect ? 'Correct!' : 'Incorrect'}</div>
+                  {lastCorrect && typo && (
+                    <div>
+                      Spelling: “{typo}” → <b>{country.name}</b>
+                    </div>
+                  )}
+                  {!lastCorrect && answerMode === 'type' && chosen && chosen !== IDK && <div>You wrote “{chosen}”</div>}
                   {!lastCorrect && (
                     <div>
                       Correct answer: <b>{country.name}</b>
@@ -290,7 +308,7 @@ export default function QuizRunner({ queue, pool, mode, answerMode, neighborLabe
                   </>
                 ) : (
                   <>
-                    <kbd>Enter</kbd> to check · <kbd>↑</kbd><kbd>↓</kbd> to pick a suggestion · <kbd>Esc</kbd> twice if you don't know
+                    <kbd>Enter</kbd> to check · small typos are forgiven · <kbd>Esc</kbd> on an empty box if you don't know
                   </>
                 )}
               </p>

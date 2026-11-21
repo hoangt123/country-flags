@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BY_CODE, COUNTRIES, REGION_EMOJI, REGIONS } from '../data'
 import { FAST100 } from '../data/fast100'
 import QuizRunner, { type QuizOutcome } from '../components/QuizRunner'
@@ -9,16 +9,18 @@ import { uid } from '../lib/format'
 import type { Country } from '../data'
 
 interface Props {
+  preset: 'fast100' | null
+  onClearPreset: () => void
   onPracticeMisses: (codes: string[]) => void
   onHome: () => void
 }
 
 export const TEST_GOAL = 100
 
-export default function Test({ onPracticeMisses, onHome }: Props) {
+export default function Test({ preset, onClearPreset, onPracticeMisses, onHome }: Props) {
   const { settings, tests } = useStore()
   const [regions, setRegions] = useState<string[]>([])
-  const [fast, setFast] = useState(false)
+  const [fast, setFast] = useState(preset === 'fast100')
   const [queue, setQueue] = useState<Country[] | null>(null)
   const [outcome, setOutcome] = useState<QuizOutcome | null>(null)
   const [runKey, setRunKey] = useState(0)
@@ -33,6 +35,16 @@ export default function Test({ onPracticeMisses, onHome }: Props) {
     setQueue(buildTestQueue(pool, size))
     setRunKey((k) => k + 1)
   }
+
+  // Arriving from "Test me on all 100": start the full Fast 100 test straight away.
+  useEffect(() => {
+    if (preset !== 'fast100') return
+    onClearPreset()
+    setOutcome(null)
+    setQueue(buildTestQueue(FAST100.map((c) => BY_CODE[c]).filter(Boolean), FAST100.length))
+    setRunKey((k) => k + 1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset])
 
   const finish = (o: QuizOutcome) => {
     store.addTest({
@@ -115,7 +127,13 @@ export default function Test({ onPracticeMisses, onHome }: Props) {
       <div className="card stack">
         <h3>Which flags</h3>
         <div className="chips">
-          <button className={`chip ${fast ? 'on' : ''}`} onClick={() => setFast(true)}>
+          <button
+            className={`chip ${fast ? 'on' : ''}`}
+            onClick={() => {
+              setFast(true)
+              store.updateSettings({ testSize: 100 })
+            }}
+          >
             🚀 Fast 100
           </button>
           <button className={`chip ${!fast && regions.length === 0 ? 'on' : ''}`} onClick={() => { setFast(false); setRegions([]) }}>
